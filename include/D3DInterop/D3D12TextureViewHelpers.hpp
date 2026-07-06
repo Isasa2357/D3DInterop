@@ -23,6 +23,18 @@ struct D3D12Texture2DSrvOptions {
     FLOAT resourceMinLODClamp = 0.0f;
 };
 
+struct D3D12Texture2DRtvOptions {
+    DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+    UINT mipSlice = 0;
+    UINT planeSlice = 0;
+};
+
+struct D3D12Texture2DUavOptions {
+    DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+    UINT mipSlice = 0;
+    UINT planeSlice = 0;
+};
+
 DXGI_FORMAT ResolveD3D12TextureViewFormat(const D3D12TextureEndpoint& endpoint,
                                           DXGI_FORMAT requestedFormat);
 
@@ -35,5 +47,25 @@ void CreateD3D12Texture2DSrv(
     const D3D12TextureEndpoint& endpoint,
     D3D12_CPU_DESCRIPTOR_HANDLE destination,
     const D3D12Texture2DSrvOptions& options = {});
+
+D3D12_RENDER_TARGET_VIEW_DESC MakeD3D12Texture2DRtvDesc(
+    const D3D12TextureEndpoint& endpoint,
+    const D3D12Texture2DRtvOptions& options = {});
+
+void CreateD3D12Texture2DRtv(
+    ID3D12Device* device,
+    const D3D12TextureEndpoint& endpoint,
+    D3D12_CPU_DESCRIPTOR_HANDLE destination,
+    const D3D12Texture2DRtvOptions& options = {});
+
+D3D12_UNORDERED_ACCESS_VIEW_DESC MakeD3D12Texture2DUavDesc(
+    const D3D12TextureEndpoint& endpoint,
+    const D3D12Texture2DUavOptions& options = {});
+
+void CreateD3D12Texture2DUav(
+    ID3D12Device* device,
+    const D3D12TextureEndpoint& endpoint,
+    D3D12_CPU_DESCRIPTOR_HANDLE destination,
+    const D3D12Texture2DUavOptions& options = {});
 
 } // namespace D3DInteropLib

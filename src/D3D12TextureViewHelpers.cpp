@@ -21,6 +21,17 @@ void ThrowIfInvalidEndpoint(const D3D12TextureEndpoint& endpoint, const char* ap
     }
 }
 
+void ThrowIfMissingResourceFlag(const D3D12TextureEndpoint& endpoint,
+                                D3D12_RESOURCE_FLAGS flag,
+                                const char* flagName,
+                                const char* apiName) {
+    const D3D12_RESOURCE_DESC resourceDesc = endpoint.Get()->GetDesc();
+    if ((resourceDesc.Flags & flag) == 0) {
+        throw std::runtime_error(
+            std::string(apiName) + ": endpoint resource does not have required flag " + flagName);
+    }
+}
+
 UINT ResolveMipLevels(const SharedTextureDesc& desc,
                       UINT mostDetailedMip,
                       UINT requestedMipLevels,
@@ -37,6 +48,12 @@ UINT ResolveMipLevels(const SharedTextureDesc& desc,
         throw std::runtime_error(std::string(apiName) + ": mipLevels is out of range");
     }
     return requestedMipLevels;
+}
+
+void ThrowIfMipSliceOutOfRange(const SharedTextureDesc& desc, UINT mipSlice, const char* apiName) {
+    if (mipSlice >= desc.mipLevels) {
+        throw std::runtime_error(std::string(apiName) + ": mipSlice is out of range");
+    }
 }
 
 } // namespace
@@ -88,6 +105,74 @@ void CreateD3D12Texture2DSrv(
 
     const D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = MakeD3D12Texture2DSrvDesc(endpoint, options);
     device->CreateShaderResourceView(endpoint.Get(), &srvDesc, destination);
+}
+
+D3D12_RENDER_TARGET_VIEW_DESC MakeD3D12Texture2DRtvDesc(
+    const D3D12TextureEndpoint& endpoint,
+    const D3D12Texture2DRtvOptions& options) {
+
+    constexpr const char* kApiName = "MakeD3D12Texture2DRtvDesc";
+    ThrowIfInvalidEndpoint(endpoint, kApiName);
+    ThrowIfMissingResourceFlag(endpoint,
+                               D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+                               "D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET",
+                               kApiName);
+    ThrowIfMipSliceOutOfRange(endpoint.Desc(), options.mipSlice, kApiName);
+
+    D3D12_RENDER_TARGET_VIEW_DESC desc = {};
+    desc.Format = ResolveD3D12TextureViewFormat(endpoint, options.format);
+    desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+    desc.Texture2D.MipSlice = options.mipSlice;
+    desc.Texture2D.PlaneSlice = options.planeSlice;
+    return desc;
+}
+
+void CreateD3D12Texture2DRtv(
+    ID3D12Device* device,
+    const D3D12TextureEndpoint& endpoint,
+    D3D12_CPU_DESCRIPTOR_HANDLE destination,
+    const D3D12Texture2DRtvOptions& options) {
+
+    if (!device) {
+        throw std::runtime_error("CreateD3D12Texture2DRtv: null ID3D12Device");
+    }
+
+    const D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = MakeD3D12Texture2DRtvDesc(endpoint, options);
+    device->CreateRenderTargetView(endpoint.Get(), &rtvDesc, destination);
+}
+
+D3D12_UNORDERED_ACCESS_VIEW_DESC MakeD3D12Texture2DUavDesc(
+    const D3D12TextureEndpoint& endpoint,
+    const D3D12Texture2DUavOptions& options) {
+
+    constexpr const char* kApiName = "MakeD3D12Texture2DUavDesc";
+    ThrowIfInvalidEndpoint(endpoint, kApiName);
+    ThrowIfMissingResourceFlag(endpoint,
+                               D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+                               "D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS",
+                               kApiName);
+    ThrowIfMipSliceOutOfRange(endpoint.Desc(), options.mipSlice, kApiName);
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
+    desc.Format = ResolveD3D12TextureViewFormat(endpoint, options.format);
+    desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+    desc.Texture2D.MipSlice = options.mipSlice;
+    desc.Texture2D.PlaneSlice = options.planeSlice;
+    return desc;
+}
+
+void CreateD3D12Texture2DUav(
+    ID3D12Device* device,
+    const D3D12TextureEndpoint& endpoint,
+    D3D12_CPU_DESCRIPTOR_HANDLE destination,
+    const D3D12Texture2DUavOptions& options) {
+
+    if (!device) {
+        throw std::runtime_error("CreateD3D12Texture2DUav: null ID3D12Device");
+    }
+
+    const D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = MakeD3D12Texture2DUavDesc(endpoint, options);
+    device->CreateUnorderedAccessView(endpoint.Get(), nullptr, &uavDesc, destination);
 }
 
 } // namespace D3DInteropLib

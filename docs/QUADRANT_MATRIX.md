@@ -6,7 +6,7 @@
 
 | Allocator / owner | Opener / user | Status | Notes |
 | --- | --- | --- | --- |
-| D3D11 | D3D12 | Supported / validated | Main cross-API path. Used by `D3D11ToD3D12TextureChannel` and `D3D11ToD3D12TextureRingChannel`. |
+| D3D11 | D3D12 | Supported / validated | Main cross-API path. Used by `D3D11ToD3D12TextureChannel` and `D3D11ToD3D12TextureRingChannel`. Typed SRV / RTV / UAV helper tests exist. |
 | D3D12 | D3D11 | Unsupported | API-level rejected by `D3D11TextureEndpoint::Open()`. Do not rely on raw `OpenSharedResource1` behavior. |
 | D3D11 | D3D11 | Supported / validated | KeyedMutex path. Used by `D3D11ToD3D11KeyedMutexChannel` and `D3D11ToD3D11KeyedMutexRingChannel`. |
 | D3D12 | D3D12 | Low-level only | Shared handle/fence primitives exist, but no high-level texture channel API is provided yet. |
@@ -50,11 +50,19 @@ D3D11 producer: Acquire(0) -> write -> Release(1)
 D3D11 consumer: Acquire(1) -> read  -> Release(0)
 ```
 
-## Typed D3D12 SRV helpers
+## Typed D3D12 view helpers
 
-For the validated `D3D11 allocator -> D3D12 opener` path, D3DInterop provides helper functions that create typed `Texture2D` SRV descriptors for a `D3D12TextureEndpoint`.
+For the validated `D3D11 allocator -> D3D12 opener` path, D3DInterop provides helper functions that create typed `Texture2D` descriptors for a `D3D12TextureEndpoint`.
 
 The helper does not allocate or own descriptor heaps. Applications still decide descriptor heap lifetime and descriptor placement.
+
+Currently provided helpers:
+
+```text
+SRV: CreateD3D12Texture2DSrv
+RTV: CreateD3D12Texture2DRtv
+UAV: CreateD3D12Texture2DUav
+```
 
 For NV12, use plane-specific typed SRVs:
 
