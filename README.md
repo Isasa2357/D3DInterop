@@ -1,9 +1,13 @@
 # D3DInterop
 
 `D3DInterop` は、`D3D11Helper` と `D3D12Helper` の上位に位置する Direct3D 11 / Direct3D 12 相互運用ライブラリです。
-同一アダプタ上で共有フェンスと共有 Texture2D を使い、D3D11 と D3D12 の GPU タイムラインとリソースを接続することを目的としています。
+同一アダプタ上で共有フェンスと共有 Texture2D を使い、D3D11 と D3D12 の GPU タイムラインとリソースを接続します。
 
-現在の実装段階は **P12 validated path** です。
+現在の実装段階は **P13 / v0.1 release hardening** です。
+
+---
+
+## v0.1 でできること
 
 - `SharedFence`
 - `D3D11FenceEndpoint`
@@ -16,26 +20,27 @@
 - `D3D11ToD3D11KeyedMutexChannel`
 - `D3D11ToD3D11KeyedMutexRingChannel`
 - D3D12 typed Texture2D SRV / RTV / UAV helper
-- typeless resource から typed SRV / RTV / UAV を作る既定 format policy
-- D3D11 allocator → D3D12 opener の NV12 / P010 / YUY2 video format view test
-- D3D11 allocator → D3D12 opener の NV12 → RGBA compute shader sample
-- D3D11 ⇔ D3D12 の shared fence roundtrip test
-- D3D11 allocator → D3D12 opener の shared texture roundtrip test
-- D3D11 allocator → D3D12 opener の reusable texture channel test
-- D3D11 allocator → D3D12 opener の multi-slot ring channel test
-- D3D11 allocator → D3D12 opener の GPU wait / no-readback sample
-- D3D11 ⇔ D3D11 KeyedMutex の最小 test
-- D3D11 ⇔ D3D11 KeyedMutex channel / ring channel test
-- D3D11 allocator → D3D12 opener の typed SRV / RTV / UAV helper test
-- D3D12 allocator → D3D11 opener の API-level rejection test
+- NV12 / P010 / P016 / YUY2 の view format policy
+- NV12 -> RGBA compute shader sample
+- D3D11 -> D3D12 -> D3D11 end-to-end sample
 - install / package 用 CMake
-- install 後 `find_package(D3DInterop CONFIG REQUIRED)` で別 consumer project から使えることを確認する CTest
+- install 後 `find_package(D3DInterop CONFIG REQUIRED)` で外部 consumer project から使えることを確認する CTest
 - `FetchContent` による `D3D11Helper` / `D3D12Helper` 取得
 
-注意: `D3D12 allocator → D3D11 opener` は一部環境で `ID3D11Device1::OpenSharedResource1` が `E_INVALIDARG` を返すことが確認されています。
-そのため、現時点の安定経路は `D3D11 allocator → D3D12 opener` です。
+注意: `D3D12 allocator -> D3D11 opener` は一部環境で `ID3D11Device1::OpenSharedResource1` が `E_INVALIDARG` を返すことが確認されています。
+そのため、現時点の安定経路は `D3D11 allocator -> D3D12 opener` です。
 つまり、**D3D12 で作成した shared Texture2D を D3D11 側で開き、D3D11 texture として扱う経路は現状サポートしません**。
 この経路は `D3D11TextureEndpoint::Open()` の入口で明示的に拒否されます。
+
+D3D12 の処理結果を D3D11 に戻したい場合も、texture 自体は D3D11 で allocate し、D3D12 がそれを open/write してください。
+
+```text
+Input texture:
+  D3D11 allocate -> D3D11 write -> D3D12 open/read
+
+Output texture:
+  D3D11 allocate -> D3D12 open/write -> D3D11 read/render/encode
+```
 
 ---
 
@@ -147,6 +152,12 @@ package config は、`D3D11Helper::D3D11Helper` / `D3D12Helper::D3D12Helper` が
 `InstalledPackageConsumer` CTest は、現在の build tree から一度 `cmake --install` を実行し、別ディレクトリの最小 consumer project を configure / build / test します。
 この consumer は `find_package(D3DInterop CONFIG REQUIRED)` と `target_link_libraries(... D3DInterop::D3DInterop)` だけで D3DInterop を利用します。
 
+通常の CTest に含まれます。
+
+```bat
+ctest --test-dir out\build\default -C Debug --output-on-failure
+```
+
 この確認を無効化したい場合は、configure 時に次を指定してください。
 
 ```bat
@@ -204,7 +215,7 @@ D3DInterop
 `D3D11Helper` と `D3D12Helper` は互いを直接参照しません。
 D3D11 と D3D12 の両方を知るのは `D3DInterop` のみです。
 
-### 同期モデル
+### SharedFence 同期モデル
 
 SharedFence 系では、Producer は共有対象への GPU 書き込みを積んだ後に `Signal(value)` します。
 Consumer は共有対象を読む前に `GpuWait(value)` または `CpuWait(value)` します。
@@ -217,6 +228,8 @@ Signal(fence, N)      -------------->  Wait(fence, N)
                                        read resource
 ```
 
+### KeyedMutex 同期モデル
+
 KeyedMutex 系では、各 texture slot を次の key protocol で回します。
 
 ```text
@@ -224,52 +237,36 @@ D3D11 producer: Acquire(0) -> write -> Release(1)
 D3D11 consumer: Acquire(1) -> read  -> Release(0)
 ```
 
-### D3D12 typed view helper
+### D3D12 typed view helpers
 
-D3D11 側で作成した shared texture を D3D12 側で SRV / RTV / UAV として扱う場合、D3DInterop は descriptor heap 自体は所有しません。
-代わりに、アプリケーションが用意した `D3D12_CPU_DESCRIPTOR_HANDLE` に対して typed view descriptor を作成する helper を提供します。
+D3D11 側で作成した shared texture を D3D12 側で shader resource / render target / unordered access として使う場合、D3DInterop は descriptor heap 自体は所有しません。
+代わりに、アプリケーションが用意した `D3D12_CPU_DESCRIPTOR_HANDLE` に typed view を作成する helper を提供します。
 
 ```cpp
 D3DInteropLib::D3D12Texture2DSrvOptions srv;
 srv.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-D3DInteropLib::CreateD3D12Texture2DSrv(device, endpoint12, srvHandle, srv);
+D3DInteropLib::CreateD3D12Texture2DSrv(device, endpoint12, srvCpu, srv);
 
 D3DInteropLib::D3D12Texture2DRtvOptions rtv;
 rtv.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-D3DInteropLib::CreateD3D12Texture2DRtv(device, endpoint12, rtvHandle, rtv);
+D3DInteropLib::CreateD3D12Texture2DRtv(device, endpoint12, rtvCpu, rtv);
 
 D3DInteropLib::D3D12Texture2DUavOptions uav;
-uav.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-D3DInteropLib::CreateD3D12Texture2DUav(device, endpoint12, uavHandle, uav);
+uav.format = DXGI_FORMAT_R32_UINT;
+D3DInteropLib::CreateD3D12Texture2DUav(device, endpoint12, uavCpu, uav);
 ```
 
-`DXGI_FORMAT_R8G8B8A8_TYPELESS` などの typeless resource では、既定の typed view format policy により `DXGI_FORMAT_R8G8B8A8_UNORM` を SRV / RTV / UAV の既定値として使えます。
-詳細は `docs/TYPED_FORMAT_VIEWS.md` を参照してください。
-
-NV12 / P010 などの multi-plane format では、plane ごとに typed SRV を作ります。
-
-```cpp
-// NV12 Y plane
-D3DInteropLib::D3D12Texture2DSrvOptions y;
-y.format = D3DInteropLib::GetD3DInteropVideoPlaneSrvFormat(DXGI_FORMAT_NV12, 0);
-y.planeSlice = 0;
-
-// NV12 UV plane
-D3DInteropLib::D3D12Texture2DSrvOptions uv;
-uv.format = D3DInteropLib::GetD3DInteropVideoPlaneSrvFormat(DXGI_FORMAT_NV12, 1);
-uv.planeSlice = 1;
-```
-
-### 現在の安定 texture quadrant
-
-現時点でテスト済みの D3D11 / D3D12 間 texture quadrant は次です。
+NV12 などの multi-plane format では、plane ごとに typed SRV を作ります。
 
 ```text
-D3D11 allocator -> D3D12 opener
-```
+NV12:
+  Plane 0: DXGI_FORMAT_R8_UNORM
+  Plane 1: DXGI_FORMAT_R8G8_UNORM
 
-D3D11 / D3D11 については、KeyedMutex channel / ring channel を提供します。
-詳細は `docs/QUADRANT_MATRIX.md` を参照してください。
+P010 / P016:
+  Plane 0: DXGI_FORMAT_R16_UNORM
+  Plane 1: DXGI_FORMAT_R16G16_UNORM
+```
 
 ---
 
@@ -296,12 +293,23 @@ CTest には以下が登録されます。
 - `GpuWait11To12`
 - `RingAsyncNoReadback11To12`
 - `Nv12ToRgbaCompute11To12`
+- `EndToEnd11To12To11`
 
 実行:
 
 ```bat
 ctest --test-dir out\build\default -C Debug --output-on-failure
 ```
+
+---
+
+## ドキュメント
+
+- `docs/QUADRANT_MATRIX.md`
+- `docs/TYPED_FORMAT_VIEWS.md`
+- `docs/USAGE_PATTERNS.md`
+- `docs/LIMITATIONS.md`
+- `docs/ROADMAP.md`
 
 ---
 
@@ -334,14 +342,13 @@ D3DInterop/
     D3D11ToD3D11KeyedMutexRingChannel.cpp
     D3D12TextureViewHelpers.cpp
   sample/
+    end_to_end_11_12_11.cpp
     nv12_to_rgba_compute_11_to_12.cpp
   test/
     package_consumer/
       CMakeLists.txt
       main.cpp
   docs/
-    QUADRANT_MATRIX.md
-    TYPED_FORMAT_VIEWS.md
   cmake/
     D3DInteropConfig.cmake.in
     RunInstalledPackageConsumerTest.cmake
@@ -369,6 +376,7 @@ D3DInterop/
 | P10 | D3D11 -> D3D12 typed SRV helper / NV12 video texture test | 実装済み |
 | P11 | D3D11 -> D3D12 typed RTV / UAV helper and write tests | 実装済み |
 | P12 | NV12 -> RGBA compute sample / P010・YUY2 view tests / typeless view policy | 実装済み |
+| P13 | v0.1 release hardening / end-to-end sample / usage docs / limitations / roadmap | 実装済み |
 
 ---
 
