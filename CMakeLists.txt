@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+﻿cmake_minimum_required(VERSION 3.20)
 
 project(D3DInterop
     VERSION 0.1.0
@@ -93,13 +93,17 @@ set(D3DINTEROP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 set(D3DINTEROP_SOURCES
     src/SharedFence.cpp
+    src/SharedTexture.cpp
     src/D3D11Endpoint.cpp
+    src/D3D11TextureEndpoint.cpp
     src/D3D12Endpoint.cpp
+    src/D3D12TextureEndpoint.cpp
 )
 
 set(D3DINTEROP_PUBLIC_HEADERS
     include/D3DInterop/D3DInteropCommon.hpp
     include/D3DInterop/SharedFence.hpp
+    include/D3DInterop/SharedTexture.hpp
     include/D3DInterop/D3D11Endpoint.hpp
     include/D3DInterop/D3D12Endpoint.hpp
     include/D3DInterop/D3DInterop.hpp
