@@ -78,3 +78,16 @@ set_tests_properties(KeyedMutexD3D11ToD3D11 PROPERTIES SKIP_RETURN_CODE 77)
 
 add_test(NAME UnsupportedD3D12ToD3D11 COMMAND test_unsupported_12_to_11)
 set_tests_properties(UnsupportedD3D12ToD3D11 PROPERTIES SKIP_RETURN_CODE 77)
+
+option(D3DINTEROP_BUILD_INSTALLED_PACKAGE_TEST "Build CTest that validates installed D3DInterop package consumption" ON)
+if(D3DINTEROP_BUILD_INSTALLED_PACKAGE_TEST)
+    add_test(
+        NAME InstalledPackageConsumer
+        COMMAND "${CMAKE_COMMAND}"
+            -DD3DINTEROP_SOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DD3DINTEROP_MAIN_BINARY_DIR=${CMAKE_BINARY_DIR}
+            -DD3DINTEROP_CONSUMER_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/package_consumer
+            -DTEST_CONFIGURATION=$<CONFIG>
+            -P ${CMAKE_SOURCE_DIR}/cmake/RunInstalledPackageConsumerTest.cmake
+    )
+endif()

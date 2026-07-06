@@ -10,6 +10,7 @@ option(D3DINTEROP_BUILD_SAMPLES "Build D3DInterop samples" ON)
 option(D3DINTEROP_ENABLE_WARNINGS "Enable compiler warnings for D3DInterop" ON)
 option(D3DINTEROP_INSTALL "Generate install rules for D3DInterop" ON)
 option(D3DINTEROP_ENABLE_CPACK "Enable CPack package generation for D3DInterop" OFF)
+option(D3DINTEROP_BUILD_INSTALLED_PACKAGE_TEST "Build CTest that validates the installed package from an external consumer project" ON)
 
 # Dependency policy:
 #   1. If D3D11Helper::D3D11Helper / D3D12Helper::D3D12Helper already exist, use them.

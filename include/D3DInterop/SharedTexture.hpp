@@ -1,8 +1,10 @@
-﻿#pragma once
+#pragma once
 //
 // SharedTexture.hpp
 // Cross-API shared Texture2D NT handle owner.
-// P2 implements D3D12 allocator -> D3D11 opener as the first texture quadrant.
+//
+// Current validated texture path:
+//   D3D11 allocator -> D3D12 opener.
 //
 #include "D3DInteropCommon.hpp"
 

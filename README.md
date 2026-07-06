@@ -3,7 +3,7 @@
 `D3DInterop` は、`D3D11Helper` と `D3D12Helper` の上位に位置する Direct3D 11 / Direct3D 12 相互運用ライブラリです。
 同一アダプタ上で共有フェンスと共有 Texture2D を使い、D3D11 と D3D12 の GPU タイムラインとリソースを接続することを目的としています。
 
-現在の実装段階は **P7 validated path** です。
+現在の実装段階は **P8 validated path** です。
 
 - `SharedFence`
 - `D3D11FenceEndpoint`
@@ -21,6 +21,7 @@
 - D3D11 ⇔ D3D11 KeyedMutex の最小 test
 - D3D12 allocator → D3D11 opener の API-level rejection test
 - install / package 用 CMake
+- install 後 `find_package(D3DInterop CONFIG REQUIRED)` で別 consumer project から使えることを確認する CTest
 - `FetchContent` による `D3D11Helper` / `D3D12Helper` 取得
 
 注意: `D3D12 allocator → D3D11 opener` は一部環境で `ID3D11Device1::OpenSharedResource1` が `E_INVALIDARG` を返すことが確認されています。
@@ -133,6 +134,25 @@ package config は、`D3D11Helper::D3D11Helper` / `D3D12Helper::D3D12Helper` が
 
 ---
 
+## install 後 consumer test
+
+`InstalledPackageConsumer` CTest は、現在の build tree から一度 `cmake --install` を実行し、別ディレクトリの最小 consumer project を configure / build / test します。
+この consumer は `find_package(D3DInterop CONFIG REQUIRED)` と `target_link_libraries(... D3DInterop::D3DInterop)` だけで D3DInterop を利用します。
+
+通常の CTest に含まれます。
+
+```bat
+ctest --test-dir out\build\default -C Debug --output-on-failure
+```
+
+この確認を無効化したい場合は、configure 時に次を指定してください。
+
+```bat
+-DD3DINTEROP_BUILD_INSTALLED_PACKAGE_TEST=OFF
+```
+
+---
+
 ## ZIP パッケージ作成
 
 CPack による ZIP package を作れます。
@@ -216,6 +236,7 @@ CTest には以下が登録されます。
 - `TextureRingChannel11To12`
 - `KeyedMutexD3D11ToD3D11`
 - `UnsupportedD3D12ToD3D11`
+- `InstalledPackageConsumer`
 - `PingPongFeedback11To12`
 - `GpuWait11To12`
 - `RingAsyncNoReadback11To12`
@@ -252,10 +273,14 @@ D3DInterop/
     D3D11ToD3D12TextureRingChannel.cpp
   sample/
   test/
+    package_consumer/
+      CMakeLists.txt
+      main.cpp
   docs/
     QUADRANT_MATRIX.md
   cmake/
     D3DInteropConfig.cmake.in
+    RunInstalledPackageConsumerTest.cmake
   CMakeLists.txt
   README.md
   .gitignore
@@ -275,6 +300,7 @@ D3DInterop/
 | P5 | reusable texture channel API | `D3D11ToD3D12TextureChannel` として実装済み |
 | P6 | multi-slot texture ring channel API | `D3D11ToD3D12TextureRingChannel` として実装済み |
 | P7 | unsupported quadrant API-level rejection / install / package CMake | 実装済み |
+| P8 | installed package external consumer test | 実装済み |
 
 ---
 
