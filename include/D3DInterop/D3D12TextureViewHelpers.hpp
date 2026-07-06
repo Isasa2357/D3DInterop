@@ -15,6 +15,27 @@ namespace D3DInteropLib {
 
 constexpr UINT D3DInteropAllTextureMips = 0xffffffffu;
 
+enum class D3D12TextureViewUsage {
+    ShaderResource,
+    RenderTarget,
+    UnorderedAccess
+};
+
+struct D3DInteropTextureViewFormatSet {
+    DXGI_FORMAT resourceFormat = DXGI_FORMAT_UNKNOWN;
+
+    // Default typed view formats used when a helper option keeps format UNKNOWN.
+    // UNKNOWN means D3DInterop has no safe default for that view usage.
+    DXGI_FORMAT defaultSrvFormat = DXGI_FORMAT_UNKNOWN;
+    DXGI_FORMAT defaultRtvFormat = DXGI_FORMAT_UNKNOWN;
+    DXGI_FORMAT defaultUavFormat = DXGI_FORMAT_UNKNOWN;
+
+    // Plane-specific SRV formats for planar / video formats.
+    // Non-planar formats use planeCount = 1 and planeSrvFormats[0] = defaultSrvFormat.
+    UINT planeCount = 1;
+    DXGI_FORMAT planeSrvFormats[2] = { DXGI_FORMAT_UNKNOWN, DXGI_FORMAT_UNKNOWN };
+};
+
 struct D3D12Texture2DSrvOptions {
     DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
     UINT mostDetailedMip = 0;
@@ -35,8 +56,15 @@ struct D3D12Texture2DUavOptions {
     UINT planeSlice = 0;
 };
 
-DXGI_FORMAT ResolveD3D12TextureViewFormat(const D3D12TextureEndpoint& endpoint,
-                                          DXGI_FORMAT requestedFormat);
+D3DInteropTextureViewFormatSet GetD3DInteropTextureViewFormatSet(DXGI_FORMAT resourceFormat);
+
+DXGI_FORMAT GetD3DInteropVideoPlaneSrvFormat(DXGI_FORMAT resourceFormat,
+                                             UINT planeSlice);
+
+DXGI_FORMAT ResolveD3D12TextureViewFormat(
+    const D3D12TextureEndpoint& endpoint,
+    DXGI_FORMAT requestedFormat,
+    D3D12TextureViewUsage usage = D3D12TextureViewUsage::ShaderResource);
 
 D3D12_SHADER_RESOURCE_VIEW_DESC MakeD3D12Texture2DSrvDesc(
     const D3D12TextureEndpoint& endpoint,

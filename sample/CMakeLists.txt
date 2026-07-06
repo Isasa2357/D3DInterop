@@ -25,10 +25,20 @@ target_link_libraries(sample_ring_async_no_readback_11_to_12
         D3DInterop::D3DInterop
 )
 
+add_executable(sample_nv12_to_rgba_compute_11_to_12
+    nv12_to_rgba_compute_11_to_12.cpp
+)
+
+target_link_libraries(sample_nv12_to_rgba_compute_11_to_12
+    PRIVATE
+        D3DInterop::D3DInterop
+)
+
 if(MSVC)
     target_compile_options(sample_ping_pong_feedback_11_to_12 PRIVATE /utf-8 /EHsc)
     target_compile_options(sample_gpu_wait_11_to_12 PRIVATE /utf-8 /EHsc)
     target_compile_options(sample_ring_async_no_readback_11_to_12 PRIVATE /utf-8 /EHsc)
+    target_compile_options(sample_nv12_to_rgba_compute_11_to_12 PRIVATE /utf-8 /EHsc)
 endif()
 
 if(D3DINTEROP_BUILD_TESTS)
@@ -40,4 +50,7 @@ if(D3DINTEROP_BUILD_TESTS)
 
     add_test(NAME RingAsyncNoReadback11To12 COMMAND sample_ring_async_no_readback_11_to_12)
     set_tests_properties(RingAsyncNoReadback11To12 PROPERTIES SKIP_RETURN_CODE 77)
+
+    add_test(NAME Nv12ToRgbaCompute11To12 COMMAND sample_nv12_to_rgba_compute_11_to_12)
+    set_tests_properties(Nv12ToRgbaCompute11To12 PROPERTIES SKIP_RETURN_CODE 77)
 endif()

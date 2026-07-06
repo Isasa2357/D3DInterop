@@ -10,6 +10,47 @@ namespace D3DInteropLib {
 
 namespace {
 
+bool IsTypelessFormat(DXGI_FORMAT format) noexcept {
+    switch (format) {
+    case DXGI_FORMAT_R32G32B32A32_TYPELESS:
+    case DXGI_FORMAT_R32G32B32_TYPELESS:
+    case DXGI_FORMAT_R16G16B16A16_TYPELESS:
+    case DXGI_FORMAT_R32G32_TYPELESS:
+    case DXGI_FORMAT_R32G8X24_TYPELESS:
+    case DXGI_FORMAT_R10G10B10A2_TYPELESS:
+    case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+    case DXGI_FORMAT_R16G16_TYPELESS:
+    case DXGI_FORMAT_R32_TYPELESS:
+    case DXGI_FORMAT_R24G8_TYPELESS:
+    case DXGI_FORMAT_R8G8_TYPELESS:
+    case DXGI_FORMAT_R16_TYPELESS:
+    case DXGI_FORMAT_R8_TYPELESS:
+    case DXGI_FORMAT_BC1_TYPELESS:
+    case DXGI_FORMAT_BC2_TYPELESS:
+    case DXGI_FORMAT_BC3_TYPELESS:
+    case DXGI_FORMAT_BC4_TYPELESS:
+    case DXGI_FORMAT_BC5_TYPELESS:
+    case DXGI_FORMAT_B8G8R8A8_TYPELESS:
+    case DXGI_FORMAT_B8G8R8X8_TYPELESS:
+    case DXGI_FORMAT_BC6H_TYPELESS:
+    case DXGI_FORMAT_BC7_TYPELESS:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool IsPlanarVideoFormat(DXGI_FORMAT format) noexcept {
+    switch (format) {
+    case DXGI_FORMAT_NV12:
+    case DXGI_FORMAT_P010:
+    case DXGI_FORMAT_P016:
+        return true;
+    default:
+        return false;
+    }
+}
+
 void ThrowIfInvalidEndpoint(const D3D12TextureEndpoint& endpoint, const char* apiName) {
     if (!endpoint.Get()) {
         throw std::runtime_error(std::string(apiName) + ": endpoint has no D3D12 resource");
@@ -21,14 +62,16 @@ void ThrowIfInvalidEndpoint(const D3D12TextureEndpoint& endpoint, const char* ap
     }
 }
 
-void ThrowIfMissingResourceFlag(const D3D12TextureEndpoint& endpoint,
-                                D3D12_RESOURCE_FLAGS flag,
-                                const char* flagName,
-                                const char* apiName) {
-    const D3D12_RESOURCE_DESC resourceDesc = endpoint.Get()->GetDesc();
-    if ((resourceDesc.Flags & flag) == 0) {
-        throw std::runtime_error(
-            std::string(apiName) + ": endpoint resource does not have required flag " + flagName);
+void ValidateMipSlice(const SharedTextureDesc& desc, UINT mipSlice, const char* apiName) {
+    if (mipSlice >= desc.mipLevels) {
+        throw std::runtime_error(std::string(apiName) + ": mipSlice is out of range");
+    }
+}
+
+void ValidatePlaneSlice(const SharedTextureDesc& desc, UINT planeSlice, const char* apiName) {
+    const auto formatSet = GetD3DInteropTextureViewFormatSet(desc.format);
+    if (planeSlice >= formatSet.planeCount) {
+        throw std::runtime_error(std::string(apiName) + ": planeSlice is out of range");
     }
 }
 
@@ -50,25 +93,168 @@ UINT ResolveMipLevels(const SharedTextureDesc& desc,
     return requestedMipLevels;
 }
 
-void ThrowIfMipSliceOutOfRange(const SharedTextureDesc& desc, UINT mipSlice, const char* apiName) {
-    if (mipSlice >= desc.mipLevels) {
-        throw std::runtime_error(std::string(apiName) + ": mipSlice is out of range");
+DXGI_FORMAT SelectDefaultFormat(const D3DInteropTextureViewFormatSet& formatSet,
+                                D3D12TextureViewUsage usage) noexcept {
+    switch (usage) {
+    case D3D12TextureViewUsage::ShaderResource:
+        return formatSet.defaultSrvFormat;
+    case D3D12TextureViewUsage::RenderTarget:
+        return formatSet.defaultRtvFormat;
+    case D3D12TextureViewUsage::UnorderedAccess:
+        return formatSet.defaultUavFormat;
+    default:
+        return DXGI_FORMAT_UNKNOWN;
+    }
+}
+
+const char* UsageName(D3D12TextureViewUsage usage) noexcept {
+    switch (usage) {
+    case D3D12TextureViewUsage::ShaderResource:
+        return "SRV";
+    case D3D12TextureViewUsage::RenderTarget:
+        return "RTV";
+    case D3D12TextureViewUsage::UnorderedAccess:
+        return "UAV";
+    default:
+        return "view";
     }
 }
 
 } // namespace
 
-DXGI_FORMAT ResolveD3D12TextureViewFormat(const D3D12TextureEndpoint& endpoint,
-                                          DXGI_FORMAT requestedFormat) {
+D3DInteropTextureViewFormatSet GetD3DInteropTextureViewFormatSet(DXGI_FORMAT resourceFormat) {
+    D3DInteropTextureViewFormatSet set;
+    set.resourceFormat = resourceFormat;
+    set.defaultSrvFormat = resourceFormat;
+    set.defaultRtvFormat = resourceFormat;
+    set.defaultUavFormat = resourceFormat;
+    set.planeCount = 1;
+    set.planeSrvFormats[0] = resourceFormat;
+    set.planeSrvFormats[1] = DXGI_FORMAT_UNKNOWN;
+
+    switch (resourceFormat) {
+    case DXGI_FORMAT_UNKNOWN:
+        set.defaultSrvFormat = DXGI_FORMAT_UNKNOWN;
+        set.defaultRtvFormat = DXGI_FORMAT_UNKNOWN;
+        set.defaultUavFormat = DXGI_FORMAT_UNKNOWN;
+        set.planeSrvFormats[0] = DXGI_FORMAT_UNKNOWN;
+        break;
+
+    case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+        set.defaultSrvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        set.defaultRtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        set.defaultUavFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        set.planeSrvFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        break;
+
+    case DXGI_FORMAT_B8G8R8A8_TYPELESS:
+        set.defaultSrvFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
+        set.defaultRtvFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
+        set.defaultUavFormat = DXGI_FORMAT_UNKNOWN;
+        set.planeSrvFormats[0] = DXGI_FORMAT_B8G8R8A8_UNORM;
+        break;
+
+    case DXGI_FORMAT_R32_TYPELESS:
+        set.defaultSrvFormat = DXGI_FORMAT_R32_FLOAT;
+        set.defaultRtvFormat = DXGI_FORMAT_R32_FLOAT;
+        set.defaultUavFormat = DXGI_FORMAT_R32_FLOAT;
+        set.planeSrvFormats[0] = DXGI_FORMAT_R32_FLOAT;
+        break;
+
+    case DXGI_FORMAT_R16_TYPELESS:
+        set.defaultSrvFormat = DXGI_FORMAT_R16_UNORM;
+        set.defaultRtvFormat = DXGI_FORMAT_R16_UNORM;
+        set.defaultUavFormat = DXGI_FORMAT_R16_UNORM;
+        set.planeSrvFormats[0] = DXGI_FORMAT_R16_UNORM;
+        break;
+
+    case DXGI_FORMAT_R8_TYPELESS:
+        set.defaultSrvFormat = DXGI_FORMAT_R8_UNORM;
+        set.defaultRtvFormat = DXGI_FORMAT_R8_UNORM;
+        set.defaultUavFormat = DXGI_FORMAT_R8_UNORM;
+        set.planeSrvFormats[0] = DXGI_FORMAT_R8_UNORM;
+        break;
+
+    case DXGI_FORMAT_NV12:
+        set.defaultSrvFormat = DXGI_FORMAT_UNKNOWN;
+        set.defaultRtvFormat = DXGI_FORMAT_UNKNOWN;
+        set.defaultUavFormat = DXGI_FORMAT_UNKNOWN;
+        set.planeCount = 2;
+        set.planeSrvFormats[0] = DXGI_FORMAT_R8_UNORM;
+        set.planeSrvFormats[1] = DXGI_FORMAT_R8G8_UNORM;
+        break;
+
+    case DXGI_FORMAT_P010:
+    case DXGI_FORMAT_P016:
+        set.defaultSrvFormat = DXGI_FORMAT_UNKNOWN;
+        set.defaultRtvFormat = DXGI_FORMAT_UNKNOWN;
+        set.defaultUavFormat = DXGI_FORMAT_UNKNOWN;
+        set.planeCount = 2;
+        set.planeSrvFormats[0] = DXGI_FORMAT_R16_UNORM;
+        set.planeSrvFormats[1] = DXGI_FORMAT_R16G16_UNORM;
+        break;
+
+    case DXGI_FORMAT_YUY2:
+        set.defaultSrvFormat = DXGI_FORMAT_YUY2;
+        set.defaultRtvFormat = DXGI_FORMAT_UNKNOWN;
+        set.defaultUavFormat = DXGI_FORMAT_UNKNOWN;
+        set.planeCount = 1;
+        set.planeSrvFormats[0] = DXGI_FORMAT_YUY2;
+        break;
+
+    default:
+        break;
+    }
+
+    return set;
+}
+
+DXGI_FORMAT GetD3DInteropVideoPlaneSrvFormat(DXGI_FORMAT resourceFormat, UINT planeSlice) {
+    const auto formatSet = GetD3DInteropTextureViewFormatSet(resourceFormat);
+    if (planeSlice >= formatSet.planeCount) {
+        throw std::runtime_error("GetD3DInteropVideoPlaneSrvFormat: planeSlice is out of range");
+    }
+
+    const DXGI_FORMAT format = formatSet.planeSrvFormats[planeSlice];
+    if (format == DXGI_FORMAT_UNKNOWN) {
+        throw std::runtime_error("GetD3DInteropVideoPlaneSrvFormat: no plane SRV format is defined for this resource format");
+    }
+    return format;
+}
+
+DXGI_FORMAT ResolveD3D12TextureViewFormat(
+    const D3D12TextureEndpoint& endpoint,
+    DXGI_FORMAT requestedFormat,
+    D3D12TextureViewUsage usage) {
+
     if (requestedFormat != DXGI_FORMAT_UNKNOWN) {
         return requestedFormat;
     }
 
-    const DXGI_FORMAT format = endpoint.Desc().format;
-    if (format == DXGI_FORMAT_UNKNOWN) {
-        throw std::runtime_error("ResolveD3D12TextureViewFormat: no valid format is available");
+    const DXGI_FORMAT resourceFormat = endpoint.Desc().format;
+    if (resourceFormat == DXGI_FORMAT_UNKNOWN) {
+        throw std::runtime_error("ResolveD3D12TextureViewFormat: no valid resource format is available");
     }
-    return format;
+
+    const auto formatSet = GetD3DInteropTextureViewFormatSet(resourceFormat);
+    const DXGI_FORMAT defaultFormat = SelectDefaultFormat(formatSet, usage);
+    if (defaultFormat != DXGI_FORMAT_UNKNOWN) {
+        return defaultFormat;
+    }
+
+    if (IsPlanarVideoFormat(resourceFormat)) {
+        throw std::runtime_error(
+            std::string("ResolveD3D12TextureViewFormat: ") + UsageName(usage) +
+            " format must be specified explicitly for planar video formats");
+    }
+
+    if (IsTypelessFormat(resourceFormat)) {
+        throw std::runtime_error(
+            std::string("ResolveD3D12TextureViewFormat: no default typed ") + UsageName(usage) +
+            " format is registered for this typeless resource format");
+    }
+
+    return resourceFormat;
 }
 
 D3D12_SHADER_RESOURCE_VIEW_DESC MakeD3D12Texture2DSrvDesc(
@@ -77,9 +263,10 @@ D3D12_SHADER_RESOURCE_VIEW_DESC MakeD3D12Texture2DSrvDesc(
 
     constexpr const char* kApiName = "MakeD3D12Texture2DSrvDesc";
     ThrowIfInvalidEndpoint(endpoint, kApiName);
+    ValidatePlaneSlice(endpoint.Desc(), options.planeSlice, kApiName);
 
     D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-    desc.Format = ResolveD3D12TextureViewFormat(endpoint, options.format);
+    desc.Format = ResolveD3D12TextureViewFormat(endpoint, options.format, D3D12TextureViewUsage::ShaderResource);
     desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     desc.Texture2D.MostDetailedMip = options.mostDetailedMip;
@@ -113,14 +300,11 @@ D3D12_RENDER_TARGET_VIEW_DESC MakeD3D12Texture2DRtvDesc(
 
     constexpr const char* kApiName = "MakeD3D12Texture2DRtvDesc";
     ThrowIfInvalidEndpoint(endpoint, kApiName);
-    ThrowIfMissingResourceFlag(endpoint,
-                               D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
-                               "D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET",
-                               kApiName);
-    ThrowIfMipSliceOutOfRange(endpoint.Desc(), options.mipSlice, kApiName);
+    ValidateMipSlice(endpoint.Desc(), options.mipSlice, kApiName);
+    ValidatePlaneSlice(endpoint.Desc(), options.planeSlice, kApiName);
 
     D3D12_RENDER_TARGET_VIEW_DESC desc = {};
-    desc.Format = ResolveD3D12TextureViewFormat(endpoint, options.format);
+    desc.Format = ResolveD3D12TextureViewFormat(endpoint, options.format, D3D12TextureViewUsage::RenderTarget);
     desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
     desc.Texture2D.MipSlice = options.mipSlice;
     desc.Texture2D.PlaneSlice = options.planeSlice;
@@ -147,14 +331,11 @@ D3D12_UNORDERED_ACCESS_VIEW_DESC MakeD3D12Texture2DUavDesc(
 
     constexpr const char* kApiName = "MakeD3D12Texture2DUavDesc";
     ThrowIfInvalidEndpoint(endpoint, kApiName);
-    ThrowIfMissingResourceFlag(endpoint,
-                               D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-                               "D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS",
-                               kApiName);
-    ThrowIfMipSliceOutOfRange(endpoint.Desc(), options.mipSlice, kApiName);
+    ValidateMipSlice(endpoint.Desc(), options.mipSlice, kApiName);
+    ValidatePlaneSlice(endpoint.Desc(), options.planeSlice, kApiName);
 
     D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
-    desc.Format = ResolveD3D12TextureViewFormat(endpoint, options.format);
+    desc.Format = ResolveD3D12TextureViewFormat(endpoint, options.format, D3D12TextureViewUsage::UnorderedAccess);
     desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
     desc.Texture2D.MipSlice = options.mipSlice;
     desc.Texture2D.PlaneSlice = options.planeSlice;

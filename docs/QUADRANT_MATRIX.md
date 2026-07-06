@@ -6,7 +6,7 @@
 
 | Allocator / owner | Opener / user | Status | Notes |
 | --- | --- | --- | --- |
-| D3D11 | D3D12 | Supported / validated | Main cross-API path. Used by `D3D11ToD3D12TextureChannel` and `D3D11ToD3D12TextureRingChannel`. Typed SRV / RTV / UAV helper tests exist. |
+| D3D11 | D3D12 | Supported / validated | Main cross-API path. Used by `D3D11ToD3D12TextureChannel`, `D3D11ToD3D12TextureRingChannel`, typed SRV/RTV/UAV helpers, video-format view tests, and NV12->RGBA compute sample. |
 | D3D12 | D3D11 | Unsupported | API-level rejected by `D3D11TextureEndpoint::Open()`. Do not rely on raw `OpenSharedResource1` behavior. |
 | D3D11 | D3D11 | Supported / validated | KeyedMutex path. Used by `D3D11ToD3D11KeyedMutexChannel` and `D3D11ToD3D11KeyedMutexRingChannel`. |
 | D3D12 | D3D12 | Low-level only | Shared handle/fence primitives exist, but no high-level texture channel API is provided yet. |
@@ -52,21 +52,30 @@ D3D11 consumer: Acquire(1) -> read  -> Release(0)
 
 ## Typed D3D12 view helpers
 
-For the validated `D3D11 allocator -> D3D12 opener` path, D3DInterop provides helper functions that create typed `Texture2D` descriptors for a `D3D12TextureEndpoint`.
+For the validated `D3D11 allocator -> D3D12 opener` path, D3DInterop provides helper functions that create typed `Texture2D` SRV / RTV / UAV descriptors for a `D3D12TextureEndpoint`.
 
 The helper does not allocate or own descriptor heaps. Applications still decide descriptor heap lifetime and descriptor placement.
 
-Currently provided helpers:
+### Typeless resource policy
+
+For common typeless resource formats, D3DInterop provides default typed view formats. Example:
 
 ```text
-SRV: CreateD3D12Texture2DSrv
-RTV: CreateD3D12Texture2DRtv
-UAV: CreateD3D12Texture2DUav
+DXGI_FORMAT_R8G8B8A8_TYPELESS -> DXGI_FORMAT_R8G8B8A8_UNORM for SRV / RTV / UAV
 ```
 
-For NV12, use plane-specific typed SRVs:
+Use explicit view formats when the default policy is not what the application wants.
+
+### Video formats
+
+For NV12 and P010, use plane-specific typed SRVs:
 
 ```text
-Plane 0: DXGI_FORMAT_R8_UNORM,   planeSlice = 0
-Plane 1: DXGI_FORMAT_R8G8_UNORM, planeSlice = 1
+NV12 Plane 0: DXGI_FORMAT_R8_UNORM,     planeSlice = 0
+NV12 Plane 1: DXGI_FORMAT_R8G8_UNORM,   planeSlice = 1
+P010 Plane 0: DXGI_FORMAT_R16_UNORM,    planeSlice = 0
+P010 Plane 1: DXGI_FORMAT_R16G16_UNORM, planeSlice = 1
+YUY2:        DXGI_FORMAT_YUY2,          planeSlice = 0
 ```
+
+`sample_nv12_to_rgba_compute_11_to_12` demonstrates reading NV12 plane SRVs from D3D12 and writing an RGBA UAV output with a compute shader.

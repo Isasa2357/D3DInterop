@@ -97,6 +97,24 @@ target_link_libraries(test_uav_write_11_to_12
         D3DInterop::D3DInterop
 )
 
+add_executable(test_video_format_views_11_to_12
+    test_video_format_views_11_to_12.cpp
+)
+
+target_link_libraries(test_video_format_views_11_to_12
+    PRIVATE
+        D3DInterop::D3DInterop
+)
+
+add_executable(test_typeless_view_policy_11_to_12
+    test_typeless_view_policy_11_to_12.cpp
+)
+
+target_link_libraries(test_typeless_view_policy_11_to_12
+    PRIVATE
+        D3DInterop::D3DInterop
+)
+
 add_executable(test_unsupported_12_to_11
     test_unsupported_12_to_11.cpp
 )
@@ -118,6 +136,8 @@ if(MSVC)
     target_compile_options(test_nv12_video_texture_11_to_12 PRIVATE /utf-8 /EHsc)
     target_compile_options(test_rtv_write_11_to_12 PRIVATE /utf-8 /EHsc)
     target_compile_options(test_uav_write_11_to_12 PRIVATE /utf-8 /EHsc)
+    target_compile_options(test_video_format_views_11_to_12 PRIVATE /utf-8 /EHsc)
+    target_compile_options(test_typeless_view_policy_11_to_12 PRIVATE /utf-8 /EHsc)
     target_compile_options(test_unsupported_12_to_11 PRIVATE /utf-8 /EHsc)
 endif()
 
@@ -153,6 +173,12 @@ set_tests_properties(RenderTargetWrite11To12 PROPERTIES SKIP_RETURN_CODE 77)
 
 add_test(NAME UnorderedAccessWrite11To12 COMMAND test_uav_write_11_to_12)
 set_tests_properties(UnorderedAccessWrite11To12 PROPERTIES SKIP_RETURN_CODE 77)
+
+add_test(NAME VideoFormatViews11To12 COMMAND test_video_format_views_11_to_12)
+set_tests_properties(VideoFormatViews11To12 PROPERTIES SKIP_RETURN_CODE 77)
+
+add_test(NAME TypelessViewPolicy11To12 COMMAND test_typeless_view_policy_11_to_12)
+set_tests_properties(TypelessViewPolicy11To12 PROPERTIES SKIP_RETURN_CODE 77)
 
 add_test(NAME UnsupportedD3D12ToD3D11 COMMAND test_unsupported_12_to_11)
 set_tests_properties(UnsupportedD3D12ToD3D11 PROPERTIES SKIP_RETURN_CODE 77)

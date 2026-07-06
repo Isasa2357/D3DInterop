@@ -3,7 +3,7 @@
 `D3DInterop` は、`D3D11Helper` と `D3D12Helper` の上位に位置する Direct3D 11 / Direct3D 12 相互運用ライブラリです。
 同一アダプタ上で共有フェンスと共有 Texture2D を使い、D3D11 と D3D12 の GPU タイムラインとリソースを接続することを目的としています。
 
-現在の実装段階は **P11 validated path** です。
+現在の実装段階は **P12 validated path** です。
 
 - `SharedFence`
 - `D3D11FenceEndpoint`
@@ -16,6 +16,9 @@
 - `D3D11ToD3D11KeyedMutexChannel`
 - `D3D11ToD3D11KeyedMutexRingChannel`
 - D3D12 typed Texture2D SRV / RTV / UAV helper
+- typeless resource から typed SRV / RTV / UAV を作る既定 format policy
+- D3D11 allocator → D3D12 opener の NV12 / P010 / YUY2 video format view test
+- D3D11 allocator → D3D12 opener の NV12 → RGBA compute shader sample
 - D3D11 ⇔ D3D12 の shared fence roundtrip test
 - D3D11 allocator → D3D12 opener の shared texture roundtrip test
 - D3D11 allocator → D3D12 opener の reusable texture channel test
@@ -23,9 +26,7 @@
 - D3D11 allocator → D3D12 opener の GPU wait / no-readback sample
 - D3D11 ⇔ D3D11 KeyedMutex の最小 test
 - D3D11 ⇔ D3D11 KeyedMutex channel / ring channel test
-- D3D11 allocator → D3D12 opener の typed SRV helper test
-- D3D11 allocator → D3D12 opener の NV12 video texture test
-- D3D11 allocator → D3D12 opener の render target / UAV write test
+- D3D11 allocator → D3D12 opener の typed SRV / RTV / UAV helper test
 - D3D12 allocator → D3D11 opener の API-level rejection test
 - install / package 用 CMake
 - install 後 `find_package(D3DInterop CONFIG REQUIRED)` で別 consumer project から使えることを確認する CTest
@@ -146,12 +147,6 @@ package config は、`D3D11Helper::D3D11Helper` / `D3D12Helper::D3D12Helper` が
 `InstalledPackageConsumer` CTest は、現在の build tree から一度 `cmake --install` を実行し、別ディレクトリの最小 consumer project を configure / build / test します。
 この consumer は `find_package(D3DInterop CONFIG REQUIRED)` と `target_link_libraries(... D3DInterop::D3DInterop)` だけで D3DInterop を利用します。
 
-通常の CTest に含まれます。
-
-```bat
-ctest --test-dir out\build\default -C Debug --output-on-failure
-```
-
 この確認を無効化したい場合は、configure 時に次を指定してください。
 
 ```bat
@@ -231,32 +226,37 @@ D3D11 consumer: Acquire(1) -> read  -> Release(0)
 
 ### D3D12 typed view helper
 
-D3D11 側で作成した shared texture を D3D12 側で shader resource / render target / unordered access として扱う場合、D3DInterop は descriptor heap 自体は所有しません。
+D3D11 側で作成した shared texture を D3D12 側で SRV / RTV / UAV として扱う場合、D3DInterop は descriptor heap 自体は所有しません。
 代わりに、アプリケーションが用意した `D3D12_CPU_DESCRIPTOR_HANDLE` に対して typed view descriptor を作成する helper を提供します。
 
 ```cpp
 D3DInteropLib::D3D12Texture2DSrvOptions srv;
 srv.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-D3DInteropLib::CreateD3D12Texture2DSrv(device, endpoint12, cpuHandle, srv);
+D3DInteropLib::CreateD3D12Texture2DSrv(device, endpoint12, srvHandle, srv);
 
 D3DInteropLib::D3D12Texture2DRtvOptions rtv;
 rtv.format = DXGI_FORMAT_R8G8B8A8_UNORM;
 D3DInteropLib::CreateD3D12Texture2DRtv(device, endpoint12, rtvHandle, rtv);
 
 D3DInteropLib::D3D12Texture2DUavOptions uav;
-uav.format = DXGI_FORMAT_R32_UINT;
+uav.format = DXGI_FORMAT_R8G8B8A8_UNORM;
 D3DInteropLib::CreateD3D12Texture2DUav(device, endpoint12, uavHandle, uav);
 ```
 
-NV12 などの multi-plane format では、plane ごとに typed SRV を作ります。
+`DXGI_FORMAT_R8G8B8A8_TYPELESS` などの typeless resource では、既定の typed view format policy により `DXGI_FORMAT_R8G8B8A8_UNORM` を SRV / RTV / UAV の既定値として使えます。
+詳細は `docs/TYPED_FORMAT_VIEWS.md` を参照してください。
+
+NV12 / P010 などの multi-plane format では、plane ごとに typed SRV を作ります。
 
 ```cpp
-// Y plane
-y.format = DXGI_FORMAT_R8_UNORM;
+// NV12 Y plane
+D3DInteropLib::D3D12Texture2DSrvOptions y;
+y.format = D3DInteropLib::GetD3DInteropVideoPlaneSrvFormat(DXGI_FORMAT_NV12, 0);
 y.planeSlice = 0;
 
-// UV plane
-uv.format = DXGI_FORMAT_R8G8_UNORM;
+// NV12 UV plane
+D3DInteropLib::D3D12Texture2DSrvOptions uv;
+uv.format = D3DInteropLib::GetD3DInteropVideoPlaneSrvFormat(DXGI_FORMAT_NV12, 1);
 uv.planeSlice = 1;
 ```
 
@@ -288,11 +288,14 @@ CTest には以下が登録されます。
 - `Nv12VideoTexture11To12`
 - `RenderTargetWrite11To12`
 - `UnorderedAccessWrite11To12`
+- `VideoFormatViews11To12`
+- `TypelessViewPolicy11To12`
 - `UnsupportedD3D12ToD3D11`
 - `InstalledPackageConsumer`
 - `PingPongFeedback11To12`
 - `GpuWait11To12`
 - `RingAsyncNoReadback11To12`
+- `Nv12ToRgbaCompute11To12`
 
 実行:
 
@@ -331,12 +334,14 @@ D3DInterop/
     D3D11ToD3D11KeyedMutexRingChannel.cpp
     D3D12TextureViewHelpers.cpp
   sample/
+    nv12_to_rgba_compute_11_to_12.cpp
   test/
     package_consumer/
       CMakeLists.txt
       main.cpp
   docs/
     QUADRANT_MATRIX.md
+    TYPED_FORMAT_VIEWS.md
   cmake/
     D3DInteropConfig.cmake.in
     RunInstalledPackageConsumerTest.cmake
@@ -363,6 +368,7 @@ D3DInterop/
 | P9 | D3D11 / D3D11 KeyedMutex channel / ring channel API | 実装済み |
 | P10 | D3D11 -> D3D12 typed SRV helper / NV12 video texture test | 実装済み |
 | P11 | D3D11 -> D3D12 typed RTV / UAV helper and write tests | 実装済み |
+| P12 | NV12 -> RGBA compute sample / P010・YUY2 view tests / typeless view policy | 実装済み |
 
 ---
 
