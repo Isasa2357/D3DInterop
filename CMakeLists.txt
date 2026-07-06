@@ -100,6 +100,7 @@ set(D3DINTEROP_SOURCES
     src/D3D12Endpoint.cpp
     src/D3D12TextureEndpoint.cpp
     src/D3D11ToD3D12TextureChannel.cpp
+    src/D3D11ToD3D12TextureRingChannel.cpp
 )
 
 set(D3DINTEROP_PUBLIC_HEADERS
@@ -109,6 +110,7 @@ set(D3DINTEROP_PUBLIC_HEADERS
     include/D3DInterop/D3D11Endpoint.hpp
     include/D3DInterop/D3D12Endpoint.hpp
     include/D3DInterop/D3D11ToD3D12TextureChannel.hpp
+    include/D3DInterop/D3D11ToD3D12TextureRingChannel.hpp
     include/D3DInterop/D3DInterop.hpp
 )
 

@@ -9,3 +9,4 @@
 #include "D3D11Endpoint.hpp"
 #include "D3D12Endpoint.hpp"
 #include "D3D11ToD3D12TextureChannel.hpp"
+#include "D3D11ToD3D12TextureRingChannel.hpp"

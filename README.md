@@ -3,7 +3,7 @@
 `D3DInterop` は、`D3D11Helper` と `D3D12Helper` の上位に位置する Direct3D 11 / Direct3D 12 相互運用ライブラリです。
 同一アダプタ上で共有フェンスと共有 Texture2D を使い、D3D11 と D3D12 の GPU タイムラインとリソースを接続することを目的としています。
 
-現在の実装段階は **P5 validated path** です。
+現在の実装段階は **P6 validated path** です。
 
 - `SharedFence`
 - `D3D11FenceEndpoint`
@@ -12,10 +12,12 @@
 - `D3D11TextureEndpoint`
 - `D3D12TextureEndpoint`
 - `D3D11ToD3D12TextureChannel`
+- `D3D11ToD3D12TextureRingChannel`
 - D3D11 ⇔ D3D12 の shared fence roundtrip test
 - D3D11 allocator → D3D12 opener の shared texture roundtrip test
 - D3D11 allocator → D3D12 opener の ping-pong / feedback loop sample
 - D3D11 allocator → D3D12 opener の reusable texture channel test
+- D3D11 allocator → D3D12 opener の multi-slot ring channel test
 - `FetchContent` による `D3D11Helper` / `D3D12Helper` 取得
 
 注意: `D3D12 allocator → D3D11 opener` は一部環境で `ID3D11Device1::OpenSharedResource1` が `E_INVALIDARG` を返すことが確認されています。
@@ -113,6 +115,7 @@ D3DInterop
   - D3D11TextureEndpoint
   - D3D12TextureEndpoint
   - D3D11ToD3D12TextureChannel
+  - D3D11ToD3D12TextureRingChannel
           |
           +---- D3D11Helper
           |
@@ -160,6 +163,19 @@ D3D11 producer waits consumedFence(N) before overwriting
 
 アプリケーションは `ProducerTexture()` で取得した D3D11 texture に書き込み、`ConsumerTexture()` で取得した D3D12 resource を読むだけで、ready / consumed の 2 本の shared fence による ping-pong 制御を利用できます。
 
+### `D3D11ToD3D12TextureRingChannel`
+
+`D3D11ToD3D12TextureRingChannel` は、`D3D11ToD3D12TextureChannel` を複数スロット化した ring buffer です。
+単一 texture の channel では consumer が読み終えるまで producer が上書きできませんが、ring channel では producer が次スロットへ進めるため、D3D11 producer と D3D12 consumer のパイプライン化に向きます。
+
+```text
+slot 0: frame 0, 3, 6, ...
+slot 1: frame 1, 4, 7, ...
+slot 2: frame 2, 5, 8, ...
+```
+
+producer が同じ slot に戻るときだけ、その slot の consumed fence を待ちます。
+
 ---
 
 ## 現在のテスト / サンプル
@@ -169,6 +185,7 @@ CTest には以下が登録されます。
 - `FenceRoundTrip`
 - `SharedTexture11To12`
 - `TextureChannel11To12`
+- `TextureRingChannel11To12`
 - `PingPongFeedback11To12`
 
 実行:
@@ -197,6 +214,7 @@ D3DInterop/
     D3D11Endpoint.hpp
     D3D12Endpoint.hpp
     D3D11ToD3D12TextureChannel.hpp
+    D3D11ToD3D12TextureRingChannel.hpp
   src/
     SharedFence.cpp
     SharedTexture.cpp
@@ -205,6 +223,7 @@ D3DInterop/
     D3D12Endpoint.cpp
     D3D12TextureEndpoint.cpp
     D3D11ToD3D12TextureChannel.cpp
+    D3D11ToD3D12TextureRingChannel.cpp
   sample/
     CMakeLists.txt
     ping_pong_feedback_11_to_12.cpp
@@ -213,6 +232,7 @@ D3DInterop/
     test_fence_roundtrip.cpp
     test_shared_texture_11_to_12.cpp
     test_texture_channel_11_to_12.cpp
+    test_texture_ring_channel_11_to_12.cpp
   docs/
     QUADRANT_MATRIX.md
   CMakeLists.txt
@@ -252,6 +272,7 @@ git status
 | P3 | available quadrant matrix の定義 / unsupported quadrant の明示 | 実装済み |
 | P4 | ping-pong / feedback loop sample | `D3D11 -> D3D12` validated path で実装済み |
 | P5 | reusable texture channel API | `D3D11ToD3D12TextureChannel` として実装済み |
+| P6 | multi-slot texture ring channel API | `D3D11ToD3D12TextureRingChannel` として実装 |
 
 ---
 
