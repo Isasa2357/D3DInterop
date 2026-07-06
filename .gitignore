@@ -1,0 +1,93 @@
+# -----------------------------------------------------------------------------
+# D3DInterop .gitignore
+# Safe for `git add .` after CMake / Visual Studio builds.
+# -----------------------------------------------------------------------------
+
+# CMake build directories
+out/
+build/
+Build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+DartConfiguration.tcl
+Testing/
+_deps/
+
+# CMake generated files
+*.cmake.user
+CMakeUserPresets.json
+install_manifest.txt
+compile_commands.json
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+ipch/
+*.ipch
+
+# Visual Studio / MSBuild outputs
+Debug/
+Release/
+RelWithDebInfo/
+MinSizeRel/
+x64/
+x86/
+ARM/
+ARM64/
+[Bb]in/
+[Oo]bj/
+
+# Native build artifacts
+*.obj
+*.o
+*.lib
+*.a
+*.dll
+*.exe
+*.pdb
+*.ilk
+*.exp
+*.idb
+*.iobj
+*.ipdb
+*.map
+*.res
+*.pch
+*.tlog
+*.lastbuildstate
+*.log
+
+# Test / runtime generated files
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+*.rej
+
+# Editor / OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local environment files
+.env
+*.local
+
+# Archives generated during handoff or packaging
+*.zip
+*.7z
+*.tar
+*.tar.gz
