@@ -43,12 +43,22 @@ target_link_libraries(test_keyed_mutex_11_to_11
         D3DInterop::D3DInterop
 )
 
+add_executable(test_unsupported_12_to_11
+    test_unsupported_12_to_11.cpp
+)
+
+target_link_libraries(test_unsupported_12_to_11
+    PRIVATE
+        D3DInterop::D3DInterop
+)
+
 if(MSVC)
     target_compile_options(test_fence_roundtrip PRIVATE /utf-8 /EHsc)
     target_compile_options(test_shared_texture_11_to_12 PRIVATE /utf-8 /EHsc)
     target_compile_options(test_texture_channel_11_to_12 PRIVATE /utf-8 /EHsc)
     target_compile_options(test_texture_ring_channel_11_to_12 PRIVATE /utf-8 /EHsc)
     target_compile_options(test_keyed_mutex_11_to_11 PRIVATE /utf-8 /EHsc)
+    target_compile_options(test_unsupported_12_to_11 PRIVATE /utf-8 /EHsc)
 endif()
 
 add_test(NAME FenceRoundTrip COMMAND test_fence_roundtrip)
@@ -65,3 +75,6 @@ set_tests_properties(TextureRingChannel11To12 PROPERTIES SKIP_RETURN_CODE 77)
 
 add_test(NAME KeyedMutexD3D11ToD3D11 COMMAND test_keyed_mutex_11_to_11)
 set_tests_properties(KeyedMutexD3D11ToD3D11 PROPERTIES SKIP_RETURN_CODE 77)
+
+add_test(NAME UnsupportedD3D12ToD3D11 COMMAND test_unsupported_12_to_11)
+set_tests_properties(UnsupportedD3D12ToD3D11 PROPERTIES SKIP_RETURN_CODE 77)

@@ -8,6 +8,8 @@ project(D3DInterop
 option(D3DINTEROP_BUILD_TESTS "Build D3DInterop tests" ON)
 option(D3DINTEROP_BUILD_SAMPLES "Build D3DInterop samples" ON)
 option(D3DINTEROP_ENABLE_WARNINGS "Enable compiler warnings for D3DInterop" ON)
+option(D3DINTEROP_INSTALL "Generate install rules for D3DInterop" ON)
+option(D3DINTEROP_ENABLE_CPACK "Enable CPack package generation for D3DInterop" OFF)
 
 # Dependency policy:
 #   1. If D3D11Helper::D3D11Helper / D3D12Helper::D3D12Helper already exist, use them.
@@ -31,6 +33,8 @@ if(NOT WIN32)
 endif()
 
 include(FetchContent)
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
 # Keep helper dependencies lightweight when they are pulled as subprojects.
 set(D3D11HELPER_BUILD_SAMPLES OFF CACHE BOOL "Build D3D11Helper samples" FORCE)
@@ -119,8 +123,10 @@ add_library(D3DInterop::D3DInterop ALIAS D3DInterop)
 
 target_include_directories(D3DInterop
     PUBLIC
-        "${D3DINTEROP_INCLUDE_DIR}"
-        "${D3DINTEROP_PUBLIC_INCLUDE_DIR}"
+        $<BUILD_INTERFACE:${D3DINTEROP_INCLUDE_DIR}>
+        $<BUILD_INTERFACE:${D3DINTEROP_PUBLIC_INCLUDE_DIR}>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/D3DInterop>
     PRIVATE
         "${D3DINTEROP_PUBLIC_INCLUDE_DIR}"
 )
@@ -163,4 +169,62 @@ endif()
 
 if(D3DINTEROP_BUILD_SAMPLES)
     add_subdirectory(sample)
+endif()
+
+if(D3DINTEROP_INSTALL)
+    install(TARGETS D3DInterop
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    )
+
+    install(DIRECTORY include/
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    )
+
+    configure_package_config_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/D3DInteropConfig.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/D3DInteropConfig.cmake"
+        INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/D3DInterop"
+    )
+
+    write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/D3DInteropConfigVersion.cmake"
+        VERSION "${PROJECT_VERSION}"
+        COMPATIBILITY SameMajorVersion
+    )
+
+    install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/D3DInteropConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/D3DInteropConfigVersion.cmake"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/D3DInterop"
+    )
+
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+        install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
+            DESTINATION "${CMAKE_INSTALL_DOCDIR}")
+    endif()
+
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs")
+        install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/docs/"
+            DESTINATION "${CMAKE_INSTALL_DOCDIR}/docs")
+    endif()
+endif()
+
+if(D3DINTEROP_ENABLE_CPACK)
+    set(CPACK_PACKAGE_NAME "D3DInterop")
+    set(CPACK_PACKAGE_VENDOR "Isasa2357")
+    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Direct3D 11 / Direct3D 12 shared fence and shared texture interop helper")
+    set(CPACK_GENERATOR "ZIP")
+    set(CPACK_SOURCE_GENERATOR "ZIP")
+    set(CPACK_SOURCE_IGNORE_FILES
+        "/out/"
+        "/build/"
+        "/\\.git/"
+        "/\\.vs/"
+        "\\.user$"
+        "\\.suo$"
+    )
+    include(CPack)
 endif()

@@ -3,7 +3,7 @@
 `D3DInterop` は、`D3D11Helper` と `D3D12Helper` の上位に位置する Direct3D 11 / Direct3D 12 相互運用ライブラリです。
 同一アダプタ上で共有フェンスと共有 Texture2D を使い、D3D11 と D3D12 の GPU タイムラインとリソースを接続することを目的としています。
 
-現在の実装段階は **P6 validated path + additional validation** です。
+現在の実装段階は **P7 validated path** です。
 
 - `SharedFence`
 - `D3D11FenceEndpoint`
@@ -15,19 +15,18 @@
 - `D3D11ToD3D12TextureRingChannel`
 - D3D11 ⇔ D3D12 の shared fence roundtrip test
 - D3D11 allocator → D3D12 opener の shared texture roundtrip test
-- D3D11 allocator → D3D12 opener の ping-pong / feedback loop sample
 - D3D11 allocator → D3D12 opener の reusable texture channel test
 - D3D11 allocator → D3D12 opener の multi-slot ring channel test
-- D3D11 allocator → D3D12 opener の GPU-wait / no-readback sample
-- D3D11 allocator → D3D12 opener の ring async / no-readback sample
-- D3D11 allocator → D3D11 opener の KeyedMutex minimal test
+- D3D11 allocator → D3D12 opener の GPU wait / no-readback sample
+- D3D11 ⇔ D3D11 KeyedMutex の最小 test
+- D3D12 allocator → D3D11 opener の API-level rejection test
+- install / package 用 CMake
 - `FetchContent` による `D3D11Helper` / `D3D12Helper` 取得
 
 注意: `D3D12 allocator → D3D11 opener` は一部環境で `ID3D11Device1::OpenSharedResource1` が `E_INVALIDARG` を返すことが確認されています。
 そのため、現時点の安定経路は `D3D11 allocator → D3D12 opener` です。
 つまり、**D3D12 で作成した shared Texture2D を D3D11 側で開き、D3D11 texture として扱う経路は現状サポートしません**。
-
-詳細は [`docs/QUADRANT_MATRIX.md`](docs/QUADRANT_MATRIX.md) を参照してください。
+この経路は `D3D11TextureEndpoint::Open()` の入口で明示的に拒否されます。
 
 ---
 
@@ -104,6 +103,56 @@ ctest --test-dir out\build\default -C Debug --output-on-failure
 
 ---
 
+## インストール
+
+`D3DInterop` は `cmake --install` に対応しています。既定では install rule が有効です。
+
+```bat
+rmdir /s /q out\build\install 2>nul
+rmdir /s /q out\install\D3DInterop 2>nul
+
+cmake -S . -B out\build\install ^
+  -DD3DINTEROP_BUILD_TESTS=OFF ^
+  -DD3DINTEROP_BUILD_SAMPLES=OFF ^
+  -DD3DINTEROP_INSTALL=ON
+
+cmake --build out\build\install --config Release
+
+cmake --install out\build\install --config Release --prefix out\install\D3DInterop
+```
+
+install 後は、別プロジェクトから次のように使えます。
+
+```cmake
+find_package(D3DInterop CONFIG REQUIRED)
+target_link_libraries(MyApp PRIVATE D3DInterop::D3DInterop)
+```
+
+package config は、`D3D11Helper::D3D11Helper` / `D3D12Helper::D3D12Helper` が未定義の場合、既定では `FetchContent` で helper を取得します。
+この挙動を止めたい場合は、利用側プロジェクトで `D3DINTEROP_PACKAGE_FETCH_HELPERS=OFF` を指定し、helper package / target を先に用意してください。
+
+---
+
+## ZIP パッケージ作成
+
+CPack による ZIP package を作れます。
+
+```bat
+rmdir /s /q out\build\package 2>nul
+
+cmake -S . -B out\build\package ^
+  -DD3DINTEROP_BUILD_TESTS=OFF ^
+  -DD3DINTEROP_BUILD_SAMPLES=OFF ^
+  -DD3DINTEROP_INSTALL=ON ^
+  -DD3DINTEROP_ENABLE_CPACK=ON
+
+cmake --build out\build\package --config Release
+
+cmake --build out\build\package --config Release --target package
+```
+
+---
+
 ## 基本設計
 
 ### レイヤ構成
@@ -153,33 +202,7 @@ Fence value は上位プロトコルが単調増加で管理します。
 D3D11 allocator -> D3D12 opener
 ```
 
-### `D3D11ToD3D12TextureChannel`
-
-`D3D11ToD3D12TextureChannel` は、現在の validated path をアプリケーションから使いやすくする高レベル API です。
-
-```text
-D3D11 producer writes frame N
-D3D11 producer signals readyFence(N)
-D3D12 consumer waits readyFence(N)
-D3D12 consumer reads frame N
-D3D12 consumer signals consumedFence(N)
-D3D11 producer waits consumedFence(N) before overwriting
-```
-
-アプリケーションは `ProducerTexture()` で取得した D3D11 texture に書き込み、`ConsumerTexture()` で取得した D3D12 resource を読むだけで、ready / consumed の 2 本の shared fence による ping-pong 制御を利用できます。
-
-### `D3D11ToD3D12TextureRingChannel`
-
-`D3D11ToD3D12TextureRingChannel` は、`D3D11ToD3D12TextureChannel` を複数スロット化した ring buffer です。
-単一 texture の channel では consumer が読み終えるまで producer が上書きできませんが、ring channel では producer が次スロットへ進めるため、D3D11 producer と D3D12 consumer のパイプライン化に向きます。
-
-```text
-slot 0: frame 0, 3, 6, ...
-slot 1: frame 1, 4, 7, ...
-slot 2: frame 2, 5, 8, ...
-```
-
-producer が同じ slot に戻るときだけ、その slot の consumed fence を待ちます。
+詳細は `docs/QUADRANT_MATRIX.md` を参照してください。
 
 ---
 
@@ -192,6 +215,7 @@ CTest には以下が登録されます。
 - `TextureChannel11To12`
 - `TextureRingChannel11To12`
 - `KeyedMutexD3D11ToD3D11`
+- `UnsupportedD3D12ToD3D11`
 - `PingPongFeedback11To12`
 - `GpuWait11To12`
 - `RingAsyncNoReadback11To12`
@@ -200,14 +224,6 @@ CTest には以下が登録されます。
 
 ```bat
 ctest --test-dir out\build\default -C Debug --output-on-failure
-```
-
-サンプル単体実行:
-
-```bat
-out\build\default\sample\Debug\sample_ping_pong_feedback_11_to_12.exe
-out\build\default\sample\Debug\sample_gpu_wait_11_to_12.exe
-out\build\default\sample\Debug\sample_ring_async_no_readback_11_to_12.exe
 ```
 
 ---
@@ -235,42 +251,14 @@ D3DInterop/
     D3D11ToD3D12TextureChannel.cpp
     D3D11ToD3D12TextureRingChannel.cpp
   sample/
-    CMakeLists.txt
-    ping_pong_feedback_11_to_12.cpp
-    gpu_wait_11_to_12.cpp
-    ring_async_no_readback_11_to_12.cpp
   test/
-    CMakeLists.txt
-    test_fence_roundtrip.cpp
-    test_shared_texture_11_to_12.cpp
-    test_texture_channel_11_to_12.cpp
-    test_texture_ring_channel_11_to_12.cpp
-    test_keyed_mutex_11_to_11.cpp
   docs/
     QUADRANT_MATRIX.md
+  cmake/
+    D3DInteropConfig.cmake.in
   CMakeLists.txt
   README.md
   .gitignore
-```
-
----
-
-## Git に入れないもの
-
-`.gitignore` により、以下は無視されます。
-
-- `out/`
-- `build/`
-- CMake の生成物
-- Visual Studio の生成物
-- 一時ファイル
-- バイナリ / オブジェクトファイル
-
-そのため、ビルド後でも基本的に次を実行できます。
-
-```bat
-git add .
-git status
 ```
 
 ---
@@ -286,7 +274,7 @@ git status
 | P4 | ping-pong / feedback loop sample | `D3D11 -> D3D12` validated path で実装済み |
 | P5 | reusable texture channel API | `D3D11ToD3D12TextureChannel` として実装済み |
 | P6 | multi-slot texture ring channel API | `D3D11ToD3D12TextureRingChannel` として実装済み |
-| Additional validation | GPU-wait sample / ring no-readback sample / KeyedMutex D3D11->D3D11 minimal test | 追加 |
+| P7 | unsupported quadrant API-level rejection / install / package CMake | 実装済み |
 
 ---
 

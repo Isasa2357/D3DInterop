@@ -1,0 +1,68 @@
+@PACKAGE_INIT@
+
+if(NOT WIN32)
+    message(FATAL_ERROR "D3DInterop is a Windows / Direct3D library")
+endif()
+
+include(FetchContent)
+
+set(D3DINTEROP_PACKAGE_FETCH_HELPERS ON CACHE BOOL
+    "Fetch D3D11Helper/D3D12Helper when a D3DInterop package is consumed and helper targets are missing")
+set(D3DINTEROP_D3D11HELPER_GIT_REPOSITORY "@D3DINTEROP_D3D11HELPER_GIT_REPOSITORY@" CACHE STRING
+    "D3D11Helper Git repository used by packaged D3DInterop")
+set(D3DINTEROP_D3D12HELPER_GIT_REPOSITORY "@D3DINTEROP_D3D12HELPER_GIT_REPOSITORY@" CACHE STRING
+    "D3D12Helper Git repository used by packaged D3DInterop")
+set(D3DINTEROP_D3D11HELPER_GIT_TAG "@D3DINTEROP_D3D11HELPER_GIT_TAG@" CACHE STRING
+    "D3D11Helper Git tag/branch/commit used by packaged D3DInterop")
+set(D3DINTEROP_D3D12HELPER_GIT_TAG "@D3DINTEROP_D3D12HELPER_GIT_TAG@" CACHE STRING
+    "D3D12Helper Git tag/branch/commit used by packaged D3DInterop")
+
+if(NOT TARGET D3D11Helper::D3D11Helper)
+    if(D3DINTEROP_PACKAGE_FETCH_HELPERS)
+        set(D3D11HELPER_BUILD_SAMPLES OFF CACHE BOOL "Build D3D11Helper samples" FORCE)
+        set(D3D11HELPER_BUILD_TESTS   OFF CACHE BOOL "Build D3D11Helper tests" FORCE)
+        FetchContent_Declare(D3D11Helper
+            GIT_REPOSITORY "${D3DINTEROP_D3D11HELPER_GIT_REPOSITORY}"
+            GIT_TAG        "${D3DINTEROP_D3D11HELPER_GIT_TAG}"
+            GIT_SHALLOW    TRUE
+        )
+        FetchContent_MakeAvailable(D3D11Helper)
+    else()
+        find_package(D3D11Helper CONFIG REQUIRED)
+    endif()
+endif()
+
+if(NOT TARGET D3D12Helper::D3D12Helper)
+    if(D3DINTEROP_PACKAGE_FETCH_HELPERS)
+        set(D3D12HELPER_BUILD_SAMPLES OFF CACHE BOOL "Build D3D12Helper samples" FORCE)
+        set(D3D12HELPER_BUILD_TESTS   OFF CACHE BOOL "Build D3D12Helper tests" FORCE)
+        FetchContent_Declare(D3D12Helper
+            GIT_REPOSITORY "${D3DINTEROP_D3D12HELPER_GIT_REPOSITORY}"
+            GIT_TAG        "${D3DINTEROP_D3D12HELPER_GIT_TAG}"
+            GIT_SHALLOW    TRUE
+        )
+        FetchContent_MakeAvailable(D3D12Helper)
+    else()
+        find_package(D3D12Helper CONFIG REQUIRED)
+    endif()
+endif()
+
+if(NOT TARGET D3DInterop::D3DInterop)
+    add_library(D3DInterop::D3DInterop STATIC IMPORTED)
+
+    set(_d3dinterop_lib "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_LIBDIR@/D3DInterop.lib")
+    if(NOT EXISTS "${_d3dinterop_lib}")
+        set(_d3dinterop_lib "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_LIBDIR@/libD3DInterop.a")
+    endif()
+
+    set_target_properties(D3DInterop::D3DInterop PROPERTIES
+        IMPORTED_LOCATION "${_d3dinterop_lib}"
+        INTERFACE_INCLUDE_DIRECTORIES
+            "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_INCLUDEDIR@;${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_INCLUDEDIR@/D3DInterop"
+        INTERFACE_COMPILE_DEFINITIONS "WIN32_LEAN_AND_MEAN;NOMINMAX"
+        INTERFACE_LINK_LIBRARIES
+            "D3D11Helper::D3D11Helper;D3D12Helper::D3D12Helper;d3d11;d3d12;dxgi;dxguid"
+    )
+endif()
+
+check_required_components(D3DInterop)
