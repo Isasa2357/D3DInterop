@@ -3,7 +3,7 @@
 `D3DInterop` は、`D3D11Helper` と `D3D12Helper` の上位に位置する Direct3D 11 / Direct3D 12 相互運用ライブラリです。
 同一アダプタ上で共有フェンスと共有 Texture2D を使い、D3D11 と D3D12 の GPU タイムラインとリソースを接続することを目的としています。
 
-現在の実装段階は **P6 validated path** です。
+現在の実装段階は **P6 validated path + additional validation** です。
 
 - `SharedFence`
 - `D3D11FenceEndpoint`
@@ -18,11 +18,16 @@
 - D3D11 allocator → D3D12 opener の ping-pong / feedback loop sample
 - D3D11 allocator → D3D12 opener の reusable texture channel test
 - D3D11 allocator → D3D12 opener の multi-slot ring channel test
+- D3D11 allocator → D3D12 opener の GPU-wait / no-readback sample
+- D3D11 allocator → D3D12 opener の ring async / no-readback sample
+- D3D11 allocator → D3D11 opener の KeyedMutex minimal test
 - `FetchContent` による `D3D11Helper` / `D3D12Helper` 取得
 
 注意: `D3D12 allocator → D3D11 opener` は一部環境で `ID3D11Device1::OpenSharedResource1` が `E_INVALIDARG` を返すことが確認されています。
 そのため、現時点の安定経路は `D3D11 allocator → D3D12 opener` です。
 つまり、**D3D12 で作成した shared Texture2D を D3D11 側で開き、D3D11 texture として扱う経路は現状サポートしません**。
+
+詳細は [`docs/QUADRANT_MATRIX.md`](docs/QUADRANT_MATRIX.md) を参照してください。
 
 ---
 
@@ -186,7 +191,10 @@ CTest には以下が登録されます。
 - `SharedTexture11To12`
 - `TextureChannel11To12`
 - `TextureRingChannel11To12`
+- `KeyedMutexD3D11ToD3D11`
 - `PingPongFeedback11To12`
+- `GpuWait11To12`
+- `RingAsyncNoReadback11To12`
 
 実行:
 
@@ -198,6 +206,8 @@ ctest --test-dir out\build\default -C Debug --output-on-failure
 
 ```bat
 out\build\default\sample\Debug\sample_ping_pong_feedback_11_to_12.exe
+out\build\default\sample\Debug\sample_gpu_wait_11_to_12.exe
+out\build\default\sample\Debug\sample_ring_async_no_readback_11_to_12.exe
 ```
 
 ---
@@ -227,12 +237,15 @@ D3DInterop/
   sample/
     CMakeLists.txt
     ping_pong_feedback_11_to_12.cpp
+    gpu_wait_11_to_12.cpp
+    ring_async_no_readback_11_to_12.cpp
   test/
     CMakeLists.txt
     test_fence_roundtrip.cpp
     test_shared_texture_11_to_12.cpp
     test_texture_channel_11_to_12.cpp
     test_texture_ring_channel_11_to_12.cpp
+    test_keyed_mutex_11_to_11.cpp
   docs/
     QUADRANT_MATRIX.md
   CMakeLists.txt
@@ -272,7 +285,8 @@ git status
 | P3 | available quadrant matrix の定義 / unsupported quadrant の明示 | 実装済み |
 | P4 | ping-pong / feedback loop sample | `D3D11 -> D3D12` validated path で実装済み |
 | P5 | reusable texture channel API | `D3D11ToD3D12TextureChannel` として実装済み |
-| P6 | multi-slot texture ring channel API | `D3D11ToD3D12TextureRingChannel` として実装 |
+| P6 | multi-slot texture ring channel API | `D3D11ToD3D12TextureRingChannel` として実装済み |
+| Additional validation | GPU-wait sample / ring no-readback sample / KeyedMutex D3D11->D3D11 minimal test | 追加 |
 
 ---
 
