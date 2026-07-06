@@ -108,6 +108,7 @@ set(D3DINTEROP_SOURCES
     src/D3D11ToD3D12TextureRingChannel.cpp
     src/D3D11ToD3D11KeyedMutexChannel.cpp
     src/D3D11ToD3D11KeyedMutexRingChannel.cpp
+    src/D3D12TextureViewHelpers.cpp
 )
 
 set(D3DINTEROP_PUBLIC_HEADERS
@@ -120,6 +121,7 @@ set(D3DINTEROP_PUBLIC_HEADERS
     include/D3DInterop/D3D11ToD3D12TextureRingChannel.hpp
     include/D3DInterop/D3D11ToD3D11KeyedMutexChannel.hpp
     include/D3DInterop/D3D11ToD3D11KeyedMutexRingChannel.hpp
+    include/D3DInterop/D3D12TextureViewHelpers.hpp
     include/D3DInterop/D3DInterop.hpp
 )
 

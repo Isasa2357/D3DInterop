@@ -1,0 +1,39 @@
+#pragma once
+//
+// D3D12TextureViewHelpers.hpp
+// Typed D3D12 Texture2D view helpers for shared textures opened through D3DInterop.
+//
+// The main validated path is:
+//   D3D11 allocator / producer -> D3D12 opener / consumer.
+//
+// These helpers intentionally create descriptors into an application-provided
+// descriptor heap handle. D3DInterop does not own descriptor heaps.
+//
+#include "D3D12Endpoint.hpp"
+
+namespace D3DInteropLib {
+
+constexpr UINT D3DInteropAllTextureMips = 0xffffffffu;
+
+struct D3D12Texture2DSrvOptions {
+    DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+    UINT mostDetailedMip = 0;
+    UINT mipLevels = D3DInteropAllTextureMips;
+    UINT planeSlice = 0;
+    FLOAT resourceMinLODClamp = 0.0f;
+};
+
+DXGI_FORMAT ResolveD3D12TextureViewFormat(const D3D12TextureEndpoint& endpoint,
+                                          DXGI_FORMAT requestedFormat);
+
+D3D12_SHADER_RESOURCE_VIEW_DESC MakeD3D12Texture2DSrvDesc(
+    const D3D12TextureEndpoint& endpoint,
+    const D3D12Texture2DSrvOptions& options = {});
+
+void CreateD3D12Texture2DSrv(
+    ID3D12Device* device,
+    const D3D12TextureEndpoint& endpoint,
+    D3D12_CPU_DESCRIPTOR_HANDLE destination,
+    const D3D12Texture2DSrvOptions& options = {});
+
+} // namespace D3DInteropLib

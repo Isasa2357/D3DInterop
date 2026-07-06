@@ -3,7 +3,7 @@
 `D3DInterop` は、`D3D11Helper` と `D3D12Helper` の上位に位置する Direct3D 11 / Direct3D 12 相互運用ライブラリです。
 同一アダプタ上で共有フェンスと共有 Texture2D を使い、D3D11 と D3D12 の GPU タイムラインとリソースを接続することを目的としています。
 
-現在の実装段階は **P9 validated path** です。
+現在の実装段階は **P10 validated path** です。
 
 - `SharedFence`
 - `D3D11FenceEndpoint`
@@ -15,6 +15,7 @@
 - `D3D11ToD3D12TextureRingChannel`
 - `D3D11ToD3D11KeyedMutexChannel`
 - `D3D11ToD3D11KeyedMutexRingChannel`
+- D3D12 typed Texture2D SRV helper
 - D3D11 ⇔ D3D12 の shared fence roundtrip test
 - D3D11 allocator → D3D12 opener の shared texture roundtrip test
 - D3D11 allocator → D3D12 opener の reusable texture channel test
@@ -22,6 +23,8 @@
 - D3D11 allocator → D3D12 opener の GPU wait / no-readback sample
 - D3D11 ⇔ D3D11 KeyedMutex の最小 test
 - D3D11 ⇔ D3D11 KeyedMutex channel / ring channel test
+- D3D11 allocator → D3D12 opener の typed SRV helper test
+- D3D11 allocator → D3D12 opener の NV12 video texture test
 - D3D12 allocator → D3D11 opener の API-level rejection test
 - install / package 用 CMake
 - install 後 `find_package(D3DInterop CONFIG REQUIRED)` で別 consumer project から使えることを確認する CTest
@@ -195,6 +198,7 @@ D3DInterop
   - D3D11ToD3D12TextureRingChannel
   - D3D11ToD3D11KeyedMutexChannel
   - D3D11ToD3D11KeyedMutexRingChannel
+  - D3D12TextureViewHelpers
           |
           +---- D3D11Helper
           |
@@ -224,6 +228,29 @@ D3D11 producer: Acquire(0) -> write -> Release(1)
 D3D11 consumer: Acquire(1) -> read  -> Release(0)
 ```
 
+### D3D12 typed SRV helper
+
+D3D11 側で作成した shared texture を D3D12 側で shader resource として読む場合、D3DInterop は descriptor heap 自体は所有しません。
+代わりに、アプリケーションが用意した `D3D12_CPU_DESCRIPTOR_HANDLE` に対して typed SRV を作成する helper を提供します。
+
+```cpp
+D3DInteropLib::D3D12Texture2DSrvOptions options;
+options.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+D3DInteropLib::CreateD3D12Texture2DSrv(device, endpoint12, cpuHandle, options);
+```
+
+NV12 などの multi-plane format では、plane ごとに typed SRV を作ります。
+
+```cpp
+// Y plane
+y.format = DXGI_FORMAT_R8_UNORM;
+y.planeSlice = 0;
+
+// UV plane
+uv.format = DXGI_FORMAT_R8G8_UNORM;
+uv.planeSlice = 1;
+```
+
 ### 現在の安定 texture quadrant
 
 現時点でテスト済みの D3D11 / D3D12 間 texture quadrant は次です。
@@ -248,6 +275,8 @@ CTest には以下が登録されます。
 - `KeyedMutexD3D11ToD3D11`
 - `KeyedMutexChannelD3D11ToD3D11`
 - `KeyedMutexRingChannelD3D11ToD3D11`
+- `TypedSrv11To12`
+- `Nv12VideoTexture11To12`
 - `UnsupportedD3D12ToD3D11`
 - `InstalledPackageConsumer`
 - `PingPongFeedback11To12`
@@ -277,6 +306,7 @@ D3DInterop/
     D3D11ToD3D12TextureRingChannel.hpp
     D3D11ToD3D11KeyedMutexChannel.hpp
     D3D11ToD3D11KeyedMutexRingChannel.hpp
+    D3D12TextureViewHelpers.hpp
   src/
     SharedFence.cpp
     SharedTexture.cpp
@@ -288,6 +318,7 @@ D3DInterop/
     D3D11ToD3D12TextureRingChannel.cpp
     D3D11ToD3D11KeyedMutexChannel.cpp
     D3D11ToD3D11KeyedMutexRingChannel.cpp
+    D3D12TextureViewHelpers.cpp
   sample/
   test/
     package_consumer/
@@ -319,6 +350,7 @@ D3DInterop/
 | P7 | unsupported quadrant API-level rejection / install / package CMake | 実装済み |
 | P8 | installed package external consumer test | 実装済み |
 | P9 | D3D11 / D3D11 KeyedMutex channel / ring channel API | 実装済み |
+| P10 | D3D11 -> D3D12 typed SRV helper / NV12 video texture test | 実装済み |
 
 ---
 

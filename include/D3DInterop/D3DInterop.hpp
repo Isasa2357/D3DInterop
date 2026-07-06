@@ -12,3 +12,4 @@
 #include "D3D11ToD3D12TextureRingChannel.hpp"
 #include "D3D11ToD3D11KeyedMutexChannel.hpp"
 #include "D3D11ToD3D11KeyedMutexRingChannel.hpp"
+#include "D3D12TextureViewHelpers.hpp"

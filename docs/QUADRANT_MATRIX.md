@@ -49,3 +49,16 @@ Both use the following fixed keyed mutex protocol per slot:
 D3D11 producer: Acquire(0) -> write -> Release(1)
 D3D11 consumer: Acquire(1) -> read  -> Release(0)
 ```
+
+## Typed D3D12 SRV helpers
+
+For the validated `D3D11 allocator -> D3D12 opener` path, D3DInterop provides helper functions that create typed `Texture2D` SRV descriptors for a `D3D12TextureEndpoint`.
+
+The helper does not allocate or own descriptor heaps. Applications still decide descriptor heap lifetime and descriptor placement.
+
+For NV12, use plane-specific typed SRVs:
+
+```text
+Plane 0: DXGI_FORMAT_R8_UNORM,   planeSlice = 0
+Plane 1: DXGI_FORMAT_R8G8_UNORM, planeSlice = 1
+```
