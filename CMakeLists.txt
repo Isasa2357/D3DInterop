@@ -99,6 +99,7 @@ set(D3DINTEROP_SOURCES
     src/D3D11TextureEndpoint.cpp
     src/D3D12Endpoint.cpp
     src/D3D12TextureEndpoint.cpp
+    src/D3D11ToD3D12TextureChannel.cpp
 )
 
 set(D3DINTEROP_PUBLIC_HEADERS
@@ -107,6 +108,7 @@ set(D3DINTEROP_PUBLIC_HEADERS
     include/D3DInterop/SharedTexture.hpp
     include/D3DInterop/D3D11Endpoint.hpp
     include/D3DInterop/D3D12Endpoint.hpp
+    include/D3DInterop/D3D11ToD3D12TextureChannel.hpp
     include/D3DInterop/D3DInterop.hpp
 )
 

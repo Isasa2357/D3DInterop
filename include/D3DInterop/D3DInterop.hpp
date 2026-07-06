@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 //
 // D3DInterop.hpp
 // Umbrella include.
@@ -8,3 +8,4 @@
 #include "SharedTexture.hpp"
 #include "D3D11Endpoint.hpp"
 #include "D3D12Endpoint.hpp"
+#include "D3D11ToD3D12TextureChannel.hpp"
