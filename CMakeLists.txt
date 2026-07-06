@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.20)
 
 project(D3DInterop
     VERSION 0.1.0
@@ -6,6 +6,7 @@ project(D3DInterop
 )
 
 option(D3DINTEROP_BUILD_TESTS "Build D3DInterop tests" ON)
+option(D3DINTEROP_BUILD_SAMPLES "Build D3DInterop samples" ON)
 option(D3DINTEROP_ENABLE_WARNINGS "Enable compiler warnings for D3DInterop" ON)
 
 # Dependency policy:
@@ -154,4 +155,8 @@ if(D3DINTEROP_BUILD_TESTS)
     include(CTest)
     enable_testing()
     add_subdirectory(test)
+endif()
+
+if(D3DINTEROP_BUILD_SAMPLES)
+    add_subdirectory(sample)
 endif()
